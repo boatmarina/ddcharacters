@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -146,47 +146,52 @@ Return ONLY valid JSON matching this exact schema, no other text:
 Make all numeric bonuses accurate based on the stats and proficiency bonus. If the character is not a spellcaster, set spellcasting to null. Be creative and faithful to the source character.`;
 
 export async function POST(req: NextRequest) {
-  try {
-    const { description } = await req.json();
+  const { description } = await req.json();
 
-    if (!description || typeof description !== "string") {
-      return NextResponse.json(
-        { error: "Character description is required" },
-        { status: 400 }
-      );
-    }
-
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: `Create a D&D character sheet for the following character:\n\n${description}`,
-        },
-      ],
-      system: SYSTEM_PROMPT,
-    });
-
-    const content = message.content[0];
-    if (content.type !== "text") {
-      throw new Error("Unexpected response type from Claude");
-    }
-
-    // Extract JSON from the response
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const character = JSON.parse(jsonMatch[0]);
-
-    return NextResponse.json({ character });
-  } catch (error) {
-    console.error("Error generating character:", error);
-    return NextResponse.json(
-      { error: "Failed to generate character. Please try again." },
-      { status: 500 }
+  if (!description || typeof description !== "string") {
+    return new Response(
+      JSON.stringify({ error: "Character description is required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const claudeStream = client.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: `Create a D&D character sheet for the following character:\n\n${description}`,
+            },
+          ],
+          system: SYSTEM_PROMPT,
+        });
+
+        for await (const chunk of claudeStream) {
+          if (
+            chunk.type === "content_block_delta" &&
+            chunk.delta.type === "text_delta"
+          ) {
+            controller.enqueue(new TextEncoder().encode(chunk.delta.text));
+          }
+        }
+        controller.close();
+      } catch (error) {
+        console.error("Error generating character:", error);
+        controller.enqueue(
+          new TextEncoder().encode(
+            JSON.stringify({ error: "Failed to generate character. Please try again." })
+          )
+        );
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }

@@ -30,13 +30,34 @@ export default function Home() {
         body: JSON.stringify({ description }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
+        const data = await res.json();
         throw new Error(data.error || "Failed to generate character");
       }
 
-      setCharacter(data.character);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+      }
+
+      // Check if the streamed content is an error JSON
+      const errorMatch = fullText.match(/^\s*\{"error":/);
+      if (errorMatch) {
+        const errData = JSON.parse(fullText);
+        throw new Error(errData.error || "Failed to generate character");
+      }
+
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No valid character data in response");
+      }
+
+      setCharacter(JSON.parse(jsonMatch[0]));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
