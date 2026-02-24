@@ -149,9 +149,9 @@ export async function POST(req: NextRequest) {
   const { description } = await req.json();
 
   if (!description || typeof description !== "string") {
-    return NextResponse.json(
-      { error: "Character description is required" },
-      { status: 400 }
+    return new Response(
+      JSON.stringify({ error: "Character description is required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
