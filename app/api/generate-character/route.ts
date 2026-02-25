@@ -155,56 +155,71 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const params = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    messages: [
+      {
+        role: "user" as const,
+        content: `Create a D&D character sheet for the following character:\n\n${description}`,
+      },
+    ],
+    system: SYSTEM_PROMPT,
+  };
+
   const stream = new ReadableStream({
     async start(controller) {
-      try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 8192,
-          messages: [
-            {
-              role: "user",
-              content: `Create a D&D character sheet for the following character:\n\n${description}`,
-            },
-          ],
-          system: SYSTEM_PROMPT,
-        });
+      const maxRetries = 3;
+      let attempt = 0;
 
-        console.log("[generate-character] Stream started");
-        let outputTokens = 0;
-
-        for await (const chunk of claudeStream) {
-          if (
-            chunk.type === "content_block_delta" &&
-            chunk.delta.type === "text_delta"
-          ) {
-            controller.enqueue(new TextEncoder().encode(chunk.delta.text));
+      while (attempt <= maxRetries) {
+        try {
+          if (attempt > 0) {
+            const delay = Math.pow(2, attempt) * 1000;
+            console.log(`[generate-character] Retry attempt ${attempt} after ${delay}ms`);
+            await new Promise((r) => setTimeout(r, delay));
           }
-          if (chunk.type === "message_delta" && chunk.usage) {
-            outputTokens = chunk.usage.output_tokens;
+
+          console.log(`[generate-character] Stream started (attempt ${attempt + 1})`);
+          const claudeStream = client.messages.stream(params);
+
+          for await (const chunk of claudeStream) {
+            if (
+              chunk.type === "content_block_delta" &&
+              chunk.delta.type === "text_delta"
+            ) {
+              controller.enqueue(new TextEncoder().encode(chunk.delta.text));
+            }
           }
-        }
 
-        const final = await claudeStream.finalMessage();
-        console.log(
-          `[generate-character] Done. stop_reason=${final.stop_reason} input_tokens=${final.usage.input_tokens} output_tokens=${final.usage.output_tokens}`
-        );
-        if (final.stop_reason === "max_tokens") {
-          console.error("[generate-character] WARNING: response was cut off by max_tokens limit");
-        }
+          const final = await claudeStream.finalMessage();
+          console.log(
+            `[generate-character] Done. stop_reason=${final.stop_reason} input_tokens=${final.usage.input_tokens} output_tokens=${final.usage.output_tokens}`
+          );
+          if (final.stop_reason === "max_tokens") {
+            console.error("[generate-character] WARNING: response was cut off by max_tokens limit");
+          }
 
-        controller.close();
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        const stack = error instanceof Error ? error.stack : undefined;
-        console.error("[generate-character] Error:", msg);
-        if (stack) console.error("[generate-character] Stack:", stack);
-        controller.enqueue(
-          new TextEncoder().encode(
-            JSON.stringify({ error: `API error: ${msg}` })
-          )
-        );
-        controller.close();
+          controller.close();
+          return;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          const isOverloaded = msg.includes("overloaded_error") || msg.includes("529");
+          console.error(`[generate-character] Error (attempt ${attempt + 1}): ${msg}`);
+
+          if (isOverloaded && attempt < maxRetries) {
+            attempt++;
+            continue;
+          }
+
+          controller.enqueue(
+            new TextEncoder().encode(
+              JSON.stringify({ error: `API error: ${msg}` })
+            )
+          );
+          controller.close();
+          return;
+        }
       }
     },
   });
