@@ -103,7 +103,7 @@ export default function Home() {
       }}
     >
       {/* Header */}
-      <header className="border-b-4 border-[#8B0000] bg-[#2d1200] py-6 px-8">
+      <header className="no-print border-b-4 border-[#8B0000] bg-[#2d1200] py-6 px-8">
         <div className="max-w-7xl mx-auto">
           <h1
             className="text-4xl font-bold text-[#D4AF37]"
@@ -122,7 +122,7 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Input Section */}
-        <div className="bg-[#2d1200] border-2 border-[#8B0000] rounded-xl p-6 mb-8 shadow-2xl">
+        <div className="no-print bg-[#2d1200] border-2 border-[#8B0000] rounded-xl p-6 mb-8 shadow-2xl">
           <div className="mb-4">
             <label
               className="block text-[#D4AF37] font-bold text-lg mb-2"
@@ -200,15 +200,26 @@ export default function Home() {
 
         {/* Error */}
         {error && (
-          <div className="bg-[#3d0000] border-2 border-red-700 rounded-xl p-4 mb-8 text-red-300">
+          <div className="no-print bg-[#3d0000] border-2 border-red-700 rounded-xl p-4 mb-8 text-red-300">
             <strong>Error:</strong> {error}
           </div>
         )}
 
         {/* Character Sheet */}
         {character && (
-          <div className="rounded-xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]">
-            <CharacterSheet character={character} />
+          <div>
+            <div className="flex justify-end mb-3 no-print">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-5 py-2 bg-[#2d1200] border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#1a0a00] font-bold rounded-lg transition-colors cursor-pointer"
+                style={{ fontFamily: "Georgia, serif" }}
+              >
+                🖨️ Print / Save as PDF
+              </button>
+            </div>
+            <div id="print-area" className="rounded-xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]">
+              <CharacterSheet character={character} />
+            </div>
           </div>
         )}
 

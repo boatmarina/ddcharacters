@@ -24,3 +24,22 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  /* Un-clip the features box so all features print */
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  /* Avoid breaking boxes across pages */
+  .border-2 {
+    break-inside: avoid;
+  }
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+}
