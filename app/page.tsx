@@ -45,19 +45,41 @@ export default function Home() {
         fullText += decoder.decode(value, { stream: true });
       }
 
+      // Strip markdown code fences if present
+      let jsonText = fullText.trim();
+      if (jsonText.startsWith("```")) {
+        jsonText = jsonText
+          .replace(/^```(?:json)?\s*\n?/, "")
+          .replace(/\n?```\s*$/, "")
+          .trim();
+      }
+
       // Check if the streamed content is an error JSON
-      const errorMatch = fullText.match(/^\s*\{"error":/);
-      if (errorMatch) {
-        const errData = JSON.parse(fullText);
+      if (/^\s*\{"error":/.test(jsonText)) {
+        const errData = JSON.parse(jsonText);
         throw new Error(errData.error || "Failed to generate character");
       }
 
-      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid character data in response");
+      // Walk braces to extract the outermost JSON object exactly
+      const start = jsonText.indexOf("{");
+      if (start === -1) throw new Error("No valid character data in response");
+
+      let depth = 0;
+      let end = -1;
+      for (let i = start; i < jsonText.length; i++) {
+        if (jsonText[i] === "{") depth++;
+        else if (jsonText[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
       }
 
-      setCharacter(JSON.parse(jsonMatch[0]));
+      if (end === -1) throw new Error("Incomplete character data in response");
+
+      setCharacter(JSON.parse(jsonText.slice(start, end + 1)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
