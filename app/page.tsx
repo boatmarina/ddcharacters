@@ -44,20 +44,49 @@ export default function Home() {
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
       }
+      fullText += decoder.decode(); // flush any remaining buffered bytes
+
+      console.log("[generate-character] Raw response length:", fullText.length);
+      console.log("[generate-character] First 300 chars:", fullText.slice(0, 300));
+      console.log("[generate-character] Last 300 chars:", fullText.slice(-300));
+
+      // Strip markdown code fences if present
+      let jsonText = fullText.trim();
+      if (jsonText.startsWith("```")) {
+        jsonText = jsonText
+          .replace(/^```(?:json)?\s*\n?/, "")
+          .replace(/\n?```\s*$/, "")
+          .trim();
+        console.log("[generate-character] Stripped markdown fences");
+      }
 
       // Check if the streamed content is an error JSON
-      const errorMatch = fullText.match(/^\s*\{"error":/);
-      if (errorMatch) {
-        const errData = JSON.parse(fullText);
+      if (/^\s*\{"error":/.test(jsonText)) {
+        const errData = JSON.parse(jsonText);
         throw new Error(errData.error || "Failed to generate character");
       }
 
-      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid character data in response");
+      // Walk braces to extract the outermost JSON object exactly
+      const start = jsonText.indexOf("{");
+      if (start === -1) throw new Error("No valid character data in response");
+
+      let depth = 0;
+      let end = -1;
+      for (let i = start; i < jsonText.length; i++) {
+        if (jsonText[i] === "{") depth++;
+        else if (jsonText[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
       }
 
-      setCharacter(JSON.parse(jsonMatch[0]));
+      console.log("[generate-character] Brace walk: depth at end =", depth, "end index =", end);
+      if (end === -1) throw new Error("Incomplete character data in response");
+
+      setCharacter(JSON.parse(jsonText.slice(start, end + 1)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

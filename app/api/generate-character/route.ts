@@ -15,6 +15,7 @@ You MUST follow these rules:
 5. Weapons and equipment should reflect what the character actually uses
 6. Spells/abilities should reflect their actual powers, even if you need to invent new ones
 7. The backstory should be accurate to the character's origin
+8. KEEP DESCRIPTIONS CONCISE — each feature/spell description must be 1-2 sentences max. Backstory max 2 sentences. Personality/ideals/bonds/flaws max 1 sentence each. Limit features to the 6 most important. Limit spells to 8 most iconic. This is critical to fit within token limits.
 
 Return ONLY valid JSON matching this exact schema, no other text:
 
@@ -155,38 +156,71 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const params = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 16000,
+    messages: [
+      {
+        role: "user" as const,
+        content: `Create a D&D character sheet for the following character:\n\n${description}`,
+      },
+    ],
+    system: SYSTEM_PROMPT,
+  };
+
   const stream = new ReadableStream({
     async start(controller) {
-      try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 4096,
-          messages: [
-            {
-              role: "user",
-              content: `Create a D&D character sheet for the following character:\n\n${description}`,
-            },
-          ],
-          system: SYSTEM_PROMPT,
-        });
+      const maxRetries = 3;
+      let attempt = 0;
 
-        for await (const chunk of claudeStream) {
-          if (
-            chunk.type === "content_block_delta" &&
-            chunk.delta.type === "text_delta"
-          ) {
-            controller.enqueue(new TextEncoder().encode(chunk.delta.text));
+      while (attempt <= maxRetries) {
+        try {
+          if (attempt > 0) {
+            const delay = Math.pow(2, attempt) * 1000;
+            console.log(`[generate-character] Retry attempt ${attempt} after ${delay}ms`);
+            await new Promise((r) => setTimeout(r, delay));
           }
+
+          console.log(`[generate-character] Stream started (attempt ${attempt + 1})`);
+          const claudeStream = client.messages.stream(params);
+
+          for await (const chunk of claudeStream) {
+            if (
+              chunk.type === "content_block_delta" &&
+              chunk.delta.type === "text_delta"
+            ) {
+              controller.enqueue(new TextEncoder().encode(chunk.delta.text));
+            }
+          }
+
+          const final = await claudeStream.finalMessage();
+          console.log(
+            `[generate-character] Done. stop_reason=${final.stop_reason} input_tokens=${final.usage.input_tokens} output_tokens=${final.usage.output_tokens}`
+          );
+          if (final.stop_reason === "max_tokens") {
+            console.error("[generate-character] WARNING: response was cut off by max_tokens limit");
+          }
+
+          controller.close();
+          return;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          const isOverloaded = msg.includes("overloaded_error") || msg.includes("529");
+          console.error(`[generate-character] Error (attempt ${attempt + 1}): ${msg}`);
+
+          if (isOverloaded && attempt < maxRetries) {
+            attempt++;
+            continue;
+          }
+
+          controller.enqueue(
+            new TextEncoder().encode(
+              JSON.stringify({ error: `API error: ${msg}` })
+            )
+          );
+          controller.close();
+          return;
         }
-        controller.close();
-      } catch (error) {
-        console.error("Error generating character:", error);
-        controller.enqueue(
-          new TextEncoder().encode(
-            JSON.stringify({ error: "Failed to generate character. Please try again." })
-          )
-        );
-        controller.close();
       }
     },
   });
