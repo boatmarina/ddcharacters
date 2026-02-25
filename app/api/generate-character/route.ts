@@ -170,6 +170,9 @@ export async function POST(req: NextRequest) {
           system: SYSTEM_PROMPT,
         });
 
+        console.log("[generate-character] Stream started");
+        let outputTokens = 0;
+
         for await (const chunk of claudeStream) {
           if (
             chunk.type === "content_block_delta" &&
@@ -177,10 +180,25 @@ export async function POST(req: NextRequest) {
           ) {
             controller.enqueue(new TextEncoder().encode(chunk.delta.text));
           }
+          if (chunk.type === "message_delta" && chunk.usage) {
+            outputTokens = chunk.usage.output_tokens;
+          }
         }
+
+        const final = await claudeStream.finalMessage();
+        console.log(
+          `[generate-character] Done. stop_reason=${final.stop_reason} input_tokens=${final.usage.input_tokens} output_tokens=${final.usage.output_tokens}`
+        );
+        if (final.stop_reason === "max_tokens") {
+          console.error("[generate-character] WARNING: response was cut off by max_tokens limit");
+        }
+
         controller.close();
       } catch (error) {
-        console.error("Error generating character:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : undefined;
+        console.error("[generate-character] Error:", msg);
+        if (stack) console.error("[generate-character] Stack:", stack);
         controller.enqueue(
           new TextEncoder().encode(
             JSON.stringify({ error: "Failed to generate character. Please try again." })

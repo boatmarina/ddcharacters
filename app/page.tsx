@@ -46,6 +46,10 @@ export default function Home() {
       }
       fullText += decoder.decode(); // flush any remaining buffered bytes
 
+      console.log("[generate-character] Raw response length:", fullText.length);
+      console.log("[generate-character] First 300 chars:", fullText.slice(0, 300));
+      console.log("[generate-character] Last 300 chars:", fullText.slice(-300));
+
       // Strip markdown code fences if present
       let jsonText = fullText.trim();
       if (jsonText.startsWith("```")) {
@@ -53,6 +57,7 @@ export default function Home() {
           .replace(/^```(?:json)?\s*\n?/, "")
           .replace(/\n?```\s*$/, "")
           .trim();
+        console.log("[generate-character] Stripped markdown fences");
       }
 
       // Check if the streamed content is an error JSON
@@ -78,6 +83,7 @@ export default function Home() {
         }
       }
 
+      console.log("[generate-character] Brace walk: depth at end =", depth, "end index =", end);
       if (end === -1) throw new Error("Incomplete character data in response");
 
       setCharacter(JSON.parse(jsonText.slice(start, end + 1)));
