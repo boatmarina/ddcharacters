@@ -44,6 +44,7 @@ export default function Home() {
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
       }
+      fullText += decoder.decode(); // flush any remaining buffered bytes
 
       // Strip markdown code fences if present
       let jsonText = fullText.trim();
