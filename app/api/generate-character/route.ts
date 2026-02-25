@@ -15,6 +15,7 @@ You MUST follow these rules:
 5. Weapons and equipment should reflect what the character actually uses
 6. Spells/abilities should reflect their actual powers, even if you need to invent new ones
 7. The backstory should be accurate to the character's origin
+8. KEEP DESCRIPTIONS CONCISE — each feature/spell description must be 1-2 sentences max. Backstory max 2 sentences. Personality/ideals/bonds/flaws max 1 sentence each. Limit features to the 6 most important. Limit spells to 8 most iconic. This is critical to fit within token limits.
 
 Return ONLY valid JSON matching this exact schema, no other text:
 
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
 
   const params = {
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 16000,
     messages: [
       {
         role: "user" as const,
