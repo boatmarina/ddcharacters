@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
         if (stack) console.error("[generate-character] Stack:", stack);
         controller.enqueue(
           new TextEncoder().encode(
-            JSON.stringify({ error: "Failed to generate character. Please try again." })
+            JSON.stringify({ error: `API error: ${msg}` })
           )
         );
         controller.close();
