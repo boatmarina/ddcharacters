@@ -50,8 +50,13 @@ export default function Home() {
       console.log("[generate-character] First 300 chars:", fullText.slice(0, 300));
       console.log("[generate-character] Last 300 chars:", fullText.slice(-300));
 
+      // Check if the stream ended cleanly
+      const streamComplete = fullText.includes("###END###");
+      console.log("[generate-character] Stream complete sentinel found:", streamComplete);
+      const cleanedText = fullText.replace("###END###", "").trim();
+
       // Strip markdown code fences if present
-      let jsonText = fullText.trim();
+      let jsonText = cleanedText;
       if (jsonText.startsWith("```")) {
         jsonText = jsonText
           .replace(/^```(?:json)?\s*\n?/, "")
@@ -64,6 +69,11 @@ export default function Home() {
       if (/^\s*\{"error":/.test(jsonText)) {
         const errData = JSON.parse(jsonText);
         throw new Error(errData.error || "Failed to generate character");
+      }
+
+      // If stream was cut off, let the user know to retry
+      if (!streamComplete) {
+        throw new Error("Generation was interrupted — please try again.");
       }
 
       // Walk braces to extract the outermost JSON object exactly
@@ -84,7 +94,7 @@ export default function Home() {
       }
 
       console.log("[generate-character] Brace walk: depth at end =", depth, "end index =", end);
-      if (end === -1) throw new Error("Incomplete character data in response");
+      if (end === -1) throw new Error("Could not parse character data — please try again.");
 
       setCharacter(JSON.parse(jsonText.slice(start, end + 1)));
     } catch (err) {

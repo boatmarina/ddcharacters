@@ -199,8 +199,11 @@ export async function POST(req: NextRequest) {
           );
           if (final.stop_reason === "max_tokens") {
             console.error("[generate-character] WARNING: response was cut off by max_tokens limit");
+            // Don't retry — just close; client will detect truncation via missing sentinel
           }
 
+          // Sentinel so the client knows the stream ended cleanly
+          controller.enqueue(new TextEncoder().encode("\n###END###\n"));
           controller.close();
           return;
         } catch (error) {
