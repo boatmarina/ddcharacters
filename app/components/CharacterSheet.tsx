@@ -547,7 +547,11 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
 
     {/* Leveling Guide — prints as page 2 */}
     <div className="leveling-guide-wrapper mt-4">
-      <LevelingGuide />
+      <LevelingGuide
+        characterClass={character.class}
+        currentLevel={character.level}
+        subclass={character.subclass}
+      />
     </div>
     </>
   );
