@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import CharacterSheet from "./components/CharacterSheet";
 import { Character } from "./types/character";
 
@@ -11,11 +11,67 @@ const EXAMPLE_PROMPTS = [
   "Hermione Granger from Harry Potter — brilliant witch with encyclopedic magical knowledge, a time-turner, wand spells, and her loyal but bossy personality.",
 ];
 
+interface SavedCharacter {
+  id: string;
+  name: string;
+  class: string;
+  level: number;
+  symbol: string;
+  savedAt: string;
+  data: Character;
+}
+
+const STORAGE_KEY = "dnd_character_history";
+const MAX_SAVED = 20;
+
+function loadSavedCharacters(): SavedCharacter[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCharacterToHistory(character: Character): SavedCharacter[] {
+  const saved = loadSavedCharacters();
+  const entry: SavedCharacter = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: character.name,
+    class: character.class,
+    level: character.level,
+    symbol: character.symbol || "⚔️",
+    savedAt: new Date().toISOString(),
+    data: character,
+  };
+  // Prepend new, cap at MAX_SAVED
+  const updated = [entry, ...saved].slice(0, MAX_SAVED);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
 export default function Home() {
   const [description, setDescription] = useState("");
+  const [level, setLevel] = useState(3);
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>([]);
+
+  useEffect(() => {
+    setSavedCharacters(loadSavedCharacters());
+  }, []);
+
+  const loadCharacter = useCallback((saved: SavedCharacter) => {
+    setCharacter(saved.data);
+    setError(null);
+  }, []);
+
+  const deleteCharacter = useCallback((id: string) => {
+    const saved = loadSavedCharacters().filter((c) => c.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    setSavedCharacters(saved);
+  }, []);
 
   async function generateCharacter() {
     if (!description.trim()) return;
@@ -27,7 +83,7 @@ export default function Home() {
       const res = await fetch("/api/generate-character", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({ description, level }),
       });
 
       if (!res.ok || !res.body) {
@@ -96,7 +152,12 @@ export default function Home() {
       console.log("[generate-character] Brace walk: depth at end =", depth, "end index =", end);
       if (end === -1) throw new Error("Could not parse character data — please try again.");
 
-      setCharacter(JSON.parse(jsonText.slice(start, end + 1)));
+      const parsed: Character = JSON.parse(jsonText.slice(start, end + 1));
+      setCharacter(parsed);
+
+      // Save to localStorage
+      const updated = saveCharacterToHistory(parsed);
+      setSavedCharacters(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -122,10 +183,10 @@ export default function Home() {
               textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
             }}
           >
-            ⚔️ D&D Character Forge
+            ⚔️ D&amp;D Character Forge
           </h1>
           <p className="text-[#c8a96e] mt-1 text-sm">
-            Transform any fictional character into a D&D 5e character sheet
+            Transform any fictional character into a D&amp;D 5e character sheet
           </p>
         </div>
       </header>
@@ -155,21 +216,43 @@ export default function Home() {
             />
           </div>
 
-          {/* Example prompts */}
-          <div className="mb-4">
-            <p className="text-[#c8a96e] text-xs mb-2 uppercase font-bold tracking-wider">
-              Quick Examples:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {EXAMPLE_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => setDescription(prompt)}
-                  className="text-xs bg-[#1a0a00] border border-[#8B0000] text-[#c8a96e] hover:border-[#D4AF37] hover:text-[#D4AF37] rounded px-3 py-1 transition-colors cursor-pointer"
-                >
-                  {prompt.split(" from ")[0].split(" — ")[0]} →
-                </button>
-              ))}
+          {/* Level Selector + Example Prompts row */}
+          <div className="flex items-start gap-6 mb-4">
+            {/* Level Dropdown */}
+            <div className="flex-shrink-0">
+              <label className="text-[#c8a96e] text-xs uppercase font-bold tracking-wider block mb-2">
+                Character Level
+              </label>
+              <select
+                value={level}
+                onChange={(e) => setLevel(Number(e.target.value))}
+                className="bg-[#1a0a00] border-2 border-[#8B0000] text-[#D4AF37] rounded-lg px-3 py-2 font-bold text-lg focus:outline-none focus:border-[#D4AF37] cursor-pointer"
+                style={{ fontFamily: "Georgia, serif" }}
+              >
+                {Array.from({ length: 20 }, (_, i) => i + 1).map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    Level {lvl}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Example prompts */}
+            <div className="flex-1">
+              <p className="text-[#c8a96e] text-xs mb-2 uppercase font-bold tracking-wider">
+                Quick Examples:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_PROMPTS.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setDescription(prompt)}
+                    className="text-xs bg-[#1a0a00] border border-[#8B0000] text-[#c8a96e] hover:border-[#D4AF37] hover:text-[#D4AF37] rounded px-3 py-1 transition-colors cursor-pointer"
+                  >
+                    {prompt.split(" from ")[0].split(" — ")[0]} →
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -208,6 +291,51 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Saved Characters */}
+        {savedCharacters.length > 0 && (
+          <div className="no-print mb-8">
+            <h2
+              className="text-[#D4AF37] font-bold text-lg mb-3"
+              style={{ fontFamily: "Georgia, serif" }}
+            >
+              📜 Saved Characters
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {savedCharacters.map((saved) => (
+                <div
+                  key={saved.id}
+                  className="flex-shrink-0 bg-[#2d1200] border-2 border-[#8B0000] rounded-lg p-3 w-48 hover:border-[#D4AF37] transition-colors group"
+                >
+                  <button
+                    onClick={() => loadCharacter(saved)}
+                    className="w-full text-left cursor-pointer"
+                  >
+                    <div className="text-lg mb-1">{saved.symbol}</div>
+                    <div className="text-[#D4AF37] font-bold text-sm truncate">
+                      {saved.name}
+                    </div>
+                    <div className="text-[#c8a96e] text-xs truncate">
+                      {saved.class} &middot; Lvl {saved.level}
+                    </div>
+                    <div className="text-[#5a3a1a] text-[10px] mt-1">
+                      {new Date(saved.savedAt).toLocaleDateString()}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCharacter(saved.id);
+                    }}
+                    className="text-[#5a3a1a] hover:text-red-500 text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="no-print bg-[#3d0000] border-2 border-red-700 rounded-xl p-4 mb-8 text-red-300">
@@ -234,14 +362,14 @@ export default function Home() {
         )}
 
         {/* Empty state */}
-        {!character && !loading && !error && (
+        {!character && !loading && !error && savedCharacters.length === 0 && (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🎲</div>
             <p
               className="text-[#c8a96e] text-lg"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              Describe a character above to forge their D&D character sheet
+              Describe a character above to forge their D&amp;D character sheet
             </p>
             <p className="text-[#5a3a1a] text-sm mt-2">
               Works with characters from any fiction — books, movies, games,

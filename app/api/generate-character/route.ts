@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `You are an expert D&D 5e character creator. When given a 
 You MUST follow these rules:
 1. Keep ALL standard D&D stats: STR, DEX, CON, INT, WIS, CHA (scores 1-30), HP, AC, Initiative, Speed, Proficiency Bonus, Saving Throws, Skills
 2. You CAN invent custom races, classes, subclasses, weapons, armor, spells, and abilities that fit the character
-3. Balance the character appropriately — choose a level (1-20) that fits their power level
+3. Generate the character at the EXACT level specified by the user. Do not change it
 4. Make personality traits, ideals, bonds, and flaws reflect the actual character
 5. Weapons and equipment should reflect what the character actually uses
 6. Spells/abilities should reflect their actual powers, even if you need to invent new ones
@@ -147,7 +147,7 @@ Return ONLY valid JSON matching this exact schema, no other text:
 Make all numeric bonuses accurate based on the stats and proficiency bonus. If the character is not a spellcaster, set spellcasting to null. Be creative and faithful to the source character.`;
 
 export async function POST(req: NextRequest) {
-  const { description } = await req.json();
+  const { description, level } = await req.json();
 
   if (!description || typeof description !== "string") {
     return new Response(
@@ -156,13 +156,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const desiredLevel = Math.max(1, Math.min(20, Number(level) || 3));
+
   const params = {
     model: "claude-sonnet-4-6",
     max_tokens: 16000,
     messages: [
       {
         role: "user" as const,
-        content: `Create a D&D character sheet for the following character:\n\n${description}`,
+        content: `Create a D&D character sheet at LEVEL ${desiredLevel} for the following character:\n\n${description}`,
       },
     ],
     system: SYSTEM_PROMPT,

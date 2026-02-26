@@ -3,6 +3,7 @@
 import { Character } from "../types/character";
 import StatBlock from "./StatBlock";
 import SkillList from "./SkillList";
+import LevelingGuide from "./LevelingGuide";
 
 interface CharacterSheetProps {
   character: Character;
@@ -61,6 +62,7 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
   );
 
   return (
+    <>
     <div
       className="character-sheet bg-[#FFF8E7] text-[#1a1a1a] font-serif"
       style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
@@ -542,5 +544,11 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
         )}
       </div>
     </div>
+
+    {/* Leveling Guide — prints as page 2 */}
+    <div className="leveling-guide-wrapper mt-4">
+      <LevelingGuide />
+    </div>
+    </>
   );
 }

@@ -38,6 +38,10 @@ body {
   .border-2 {
     break-inside: avoid;
   }
+  /* Leveling guide starts on a new page */
+  .leveling-guide-wrapper {
+    break-before: page;
+  }
   @page {
     margin: 0.5in;
     size: letter;
