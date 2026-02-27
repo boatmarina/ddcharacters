@@ -551,6 +551,8 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
         characterClass={character.class}
         currentLevel={character.level}
         subclass={character.subclass}
+        characterFeatures={character.features}
+        isSpellcaster={!!character.spellcasting}
       />
     </div>
     </>

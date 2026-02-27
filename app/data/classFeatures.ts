@@ -759,16 +759,208 @@ export const CLASS_PROGRESSIONS: Record<string, LevelEntry[]> = {
   ],
 };
 
-// Normalise class name to look up the right progression
+// Exact match only — no fuzzy fallback
 export function findClassProgression(className: string): LevelEntry[] | null {
   const normalized = className.toLowerCase().trim();
-  // Exact match first
   for (const key of Object.keys(CLASS_PROGRESSIONS)) {
     if (key.toLowerCase() === normalized) return CLASS_PROGRESSIONS[key];
   }
-  // Partial match — does the character's class contain a standard class name?
-  for (const key of Object.keys(CLASS_PROGRESSIONS)) {
-    if (normalized.includes(key.toLowerCase())) return CLASS_PROGRESSIONS[key];
-  }
   return null;
+}
+
+// ─── Custom class progression generator ────────────────────────────────────
+// Takes the character's actual features and manufactures a believable
+// level 1-20 progression, using those features as seeds and inventing
+// appropriate upgrades and milestones in between.
+
+interface CharFeat {
+  name: string;
+  source: string;
+  description: string;
+}
+
+export function generateCustomProgression(
+  className: string,
+  characterFeatures: CharFeat[],
+  isSpellcaster: boolean,
+  subclass?: string
+): LevelEntry[] {
+  const ASI_LEVELS = new Set([4, 8, 12, 16, 19]);
+  const asiFeature: ClassFeature = {
+    name: "ASI / Feat",
+    description: "Increase one ability score by 2, or two scores by 1 each, or choose a feat.",
+  };
+
+  const featureMap: Map<number, ClassFeature[]> = new Map();
+  const add = (level: number, f: ClassFeature) => {
+    if (!featureMap.has(level)) featureMap.set(level, []);
+    featureMap.get(level)!.push(f);
+  };
+
+  const f = (i: number) => characterFeatures[i];
+  const asFeature = (feat: CharFeat): ClassFeature => ({
+    name: feat.name,
+    description: feat.description,
+  });
+
+  // ── Level 1: first 1–2 features (core class identity) ──────────────────
+  if (f(0)) add(1, asFeature(f(0)));
+  if (f(1)) add(1, asFeature(f(1)));
+
+  // ── Level 2: third feature or generated ────────────────────────────────
+  if (f(2)) {
+    add(2, asFeature(f(2)));
+  } else {
+    add(2, {
+      name: isSpellcaster ? "Arcane Focus" : "Combat Discipline",
+      description: isSpellcaster
+        ? `Your magical training deepens — you gain a bonus cantrip and can spend 10 minutes to recover one expended spell slot of 1st level after a short rest.`
+        : `Your ${className.toLowerCase()} training sharpens your instincts: you can add your proficiency bonus to initiative rolls, and once per short rest you can make one additional attack as a bonus action.`,
+    });
+  }
+
+  // ── Level 3: subclass choice ────────────────────────────────────────────
+  add(3, {
+    name: subclass ? `${className} Path: ${subclass}` : `${className} Path (Subclass)`,
+    description: `Choose your ${className} specialization${subclass ? ` — ${subclass}` : ""}, defining your unique style. This path grants features at levels 3, 7, 10, and 14.`,
+  });
+  // give 4th feature at level 3 if available
+  if (f(3)) add(3, asFeature(f(3)));
+
+  // ── Level 5: power spike + 5th feature ─────────────────────────────────
+  if (!isSpellcaster) {
+    add(5, {
+      name: "Extra Attack",
+      description: "You attack twice instead of once when you take the Attack action on your turn.",
+    });
+  } else {
+    add(5, {
+      name: "Empowered Casting",
+      description: `Once per turn when you deal damage with a spell or ability, you can add your primary ability modifier to the damage roll. Your spell save DC also improves by 1.`,
+    });
+  }
+  if (f(4)) add(5, asFeature(f(4)));
+
+  // ── Level 6: subclass feature + improved version of feature[0] ─────────
+  add(6, {
+    name: "Path Feature",
+    description: `Your ${className} path grants an additional feature.`,
+  });
+  if (f(0)) {
+    add(6, {
+      name: `Improved ${f(0).name}`,
+      description: `Your ${f(0).name} grows more powerful: ${f(0).description} You can now use it one additional time per rest, and its effects last twice as long.`,
+    });
+  }
+
+  // ── Level 7: path feature + 6th character feature ──────────────────────
+  if (f(5)) {
+    add(7, asFeature(f(5)));
+  } else {
+    add(7, {
+      name: `${className} Technique`,
+      description: `Your training yields a signature ${className.toLowerCase()} technique — a powerful maneuver or ability unique to your path that you can use once per short rest.`,
+    });
+  }
+
+  // ── Level 9: resilience milestone ──────────────────────────────────────
+  add(9, {
+    name: isSpellcaster ? "Arcane Resilience" : "Unbreakable",
+    description: isSpellcaster
+      ? `Concentration saves use your full spellcasting modifier, and you have advantage on saving throws against spells and magical effects.`
+      : `When you would be reduced to 0 HP you can use your reaction to instead drop to 1 HP. Usable once per long rest. You also gain proficiency in one saving throw of your choice.`,
+  });
+
+  // ── Level 10: path feature + 7th character feature ─────────────────────
+  add(10, {
+    name: "Path Feature",
+    description: `Your ${className} path grants a significant feature.`,
+  });
+  if (f(6)) add(10, asFeature(f(6)));
+
+  // ── Level 11: attack or magic power spike ──────────────────────────────
+  if (!isSpellcaster) {
+    add(11, {
+      name: "Superior Strike",
+      description: `You attack three times instead of twice when you take the Attack action. In addition, your attacks score a critical hit on a roll of 19 or 20.`,
+    });
+  } else {
+    add(11, {
+      name: "Greater Power",
+      description: `Once per turn when you cast a spell or use an ability that deals damage, you may reroll any number of damage dice and use either result. Your abilities now affect a wider area or more targets.`,
+    });
+  }
+
+  // ── Level 13: advanced version of feature[1] ───────────────────────────
+  const advSource = f(1) || f(0);
+  if (advSource) {
+    add(13, {
+      name: `Advanced ${advSource.name}`,
+      description: `Your mastery of ${advSource.name} reaches new heights — ${advSource.description} It can now target additional creatures, has extended range, and its power is significantly greater than before.`,
+    });
+  } else {
+    add(13, {
+      name: `${className} Expertise`,
+      description: `Decades of training grant you unparalleled expertise. Double your proficiency bonus on any ${className.toLowerCase()}-related check, and you can't have disadvantage on such checks.`,
+    });
+  }
+
+  // ── Level 14: path capstone + 8th character feature ────────────────────
+  add(14, {
+    name: "Path Capstone",
+    description: `Your ${className} path grants its most powerful feature yet.`,
+  });
+  if (f(7)) add(14, asFeature(f(7)));
+
+  // ── Level 15: endurance milestone ──────────────────────────────────────
+  add(15, {
+    name: isSpellcaster ? "Spell Endurance" : "Indomitable Will",
+    description: isSpellcaster
+      ? `You can maintain concentration on two spells simultaneously. Additionally, you can cast one spell of 5th level or lower without using a spell slot once per long rest.`
+      : `When you fail a saving throw, you can use your reaction to reroll it and take the new result. You may do this twice per long rest. You also gain resistance to one damage type of your choice.`,
+  });
+
+  // ── Level 17: perfect version of feature[2] ────────────────────────────
+  const perfSource = f(2) || f(1) || f(0);
+  if (perfSource) {
+    add(17, {
+      name: `Perfect ${perfSource.name}`,
+      description: `You have perfected your use of ${perfSource.name} — it no longer requires an action to activate (bonus action instead), its effects are dramatically more powerful, and it recharges on a short rest.`,
+    });
+  }
+  if (f(8)) add(17, asFeature(f(8)));
+
+  // ── Level 18: legendary milestone ──────────────────────────────────────
+  add(18, {
+    name: isSpellcaster ? `Legendary Spellcraft` : `Legendary ${f(0)?.name ?? className}`,
+    description: isSpellcaster
+      ? `Your magic transcends mortal limits. Once per long rest, cast any spell you know at maximum effect without expending a spell slot and without concentration. Enemies have disadvantage on saves against your abilities.`
+      : f(0)
+      ? `Your ${f(0).name} transcends normal limits: ${f(0).description} The power is overwhelming — all nearby enemies must make a Wisdom save or be frightened for 1 minute.`
+      : `Your ${className.toLowerCase()} power becomes legendary. You are immune to being charmed or frightened, and your attacks are treated as magical and silvered.`,
+  });
+
+  // ── Level 20: paragon capstone ──────────────────────────────────────────
+  add(20, {
+    name: `${className} Paragon`,
+    description: `You embody the pinnacle of the ${className.toLowerCase()} arts. Once per long rest, enter a legendary state for 1 minute: all ability checks, attack rolls, and saving throws are made with advantage; your damage rolls deal maximum damage; and you regain 20 HP at the start of each of your turns.`,
+  });
+
+  // ── ASIs at standard levels ─────────────────────────────────────────────
+  for (const lvl of ASI_LEVELS) {
+    const existing = featureMap.get(lvl) ?? [];
+    featureMap.set(lvl, [asiFeature, ...existing]);
+  }
+
+  // ── Fill any remaining empty levels with generic flavored content ───────
+  const genericFeature = (level: number): ClassFeature => ({
+    name: `${className} Advancement`,
+    description: `Your ${className.toLowerCase()} training and experience at level ${level} sharpens an existing ability — increasing its range, number of uses, or potency — and grants minor utility unique to your specialization.`,
+  });
+
+  return Array.from({ length: 20 }, (_, i) => {
+    const level = i + 1;
+    const features = featureMap.get(level) ?? [genericFeature(level)];
+    return { level, profBonus: p(level), features };
+  });
 }
