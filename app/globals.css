@@ -29,6 +29,12 @@ body {
   .no-print {
     display: none !important;
   }
+  .no-print-edit {
+    pointer-events: none;
+  }
+  .no-print-edit span {
+    display: none !important;
+  }
   /* Un-clip the features box so all features print */
   .overflow-y-auto {
     overflow: visible !important;

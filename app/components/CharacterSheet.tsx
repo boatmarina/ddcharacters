@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { Character } from "../types/character";
 import StatBlock from "./StatBlock";
 import SkillList from "./SkillList";
@@ -7,6 +8,7 @@ import LevelingGuide from "./LevelingGuide";
 
 interface CharacterSheetProps {
   character: Character;
+  onNameChange?: (name: string) => void;
 }
 
 function Box({
@@ -51,7 +53,56 @@ function BigBox({
   );
 }
 
-export default function CharacterSheet({ character }: CharacterSheetProps) {
+export default function CharacterSheet({ character, onNameChange }: CharacterSheetProps) {
+  const [nameValue, setNameValue] = useState(character.name);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [loadingName, setLoadingName] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep in sync when parent updates character (e.g. after a new generation)
+  useEffect(() => {
+    if (!isEditingName) setNameValue(character.name);
+  }, [character.name, isEditingName]);
+
+  // Focus + select-all when editing begins
+  useEffect(() => {
+    if (isEditingName) inputRef.current?.select();
+  }, [isEditingName]);
+
+  function commitName() {
+    setIsEditingName(false);
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== character.name) onNameChange?.(trimmed);
+    else setNameValue(character.name); // revert if empty
+  }
+
+  async function randomizeName() {
+    setLoadingName(true);
+    try {
+      const res = await fetch("/api/generate-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          race: character.race,
+          characterClass: character.class,
+          subclass: character.subclass,
+          background: character.background,
+          alignment: character.alignment,
+          currentName: nameValue,
+        }),
+      });
+      const data = await res.json();
+      if (data.name) {
+        setNameValue(data.name);
+        onNameChange?.(data.name);
+      }
+    } catch {
+      // silently ignore — name stays the same
+    } finally {
+      setLoadingName(false);
+    }
+  }
+
   const spellsByLevel = character.spellcasting?.spells.reduce(
     (acc, spell) => {
       if (!acc[spell.level]) acc[spell.level] = [];
@@ -80,8 +131,54 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
         <div className="border-b-4 border-[#8B0000] p-4 bg-[#8B0000]">
           <div className="flex items-center justify-between">
             <div className="text-white">
-              <div className="text-3xl font-bold tracking-wider">
-                {character.symbol || "⚔️"} {character.name}
+              <div className="flex items-center gap-2 text-3xl font-bold tracking-wider">
+                <span>{character.symbol || "⚔️"}</span>
+
+                {/* Editable name */}
+                {isEditingName ? (
+                  <input
+                    ref={inputRef}
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onBlur={commitName}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitName();
+                      if (e.key === "Escape") {
+                        setNameValue(character.name);
+                        setIsEditingName(false);
+                      }
+                    }}
+                    className="bg-transparent border-b-2 border-[#D4AF37] text-white outline-none w-auto min-w-[8ch]"
+                    style={{ fontFamily: "inherit", fontSize: "inherit", fontWeight: "inherit" }}
+                    size={Math.max(nameValue.length, 8)}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setIsEditingName(true)}
+                    title="Click to edit name"
+                    className="no-print-edit group relative text-white hover:text-[#D4AF37] transition-colors cursor-text text-left"
+                    style={{ fontFamily: "inherit", fontSize: "inherit", fontWeight: "inherit", background: "none", border: "none", padding: 0 }}
+                  >
+                    {nameValue}
+                    <span className="ml-1.5 text-base opacity-0 group-hover:opacity-60 transition-opacity">✏️</span>
+                  </button>
+                )}
+
+                {/* Random name button */}
+                <button
+                  onClick={randomizeName}
+                  disabled={loadingName}
+                  title="Generate a new name"
+                  className="no-print ml-1 text-xl text-[#D4AF37] hover:text-white disabled:opacity-40 transition-colors cursor-pointer"
+                  style={{ background: "none", border: "none", padding: 0, lineHeight: 1 }}
+                >
+                  {loadingName ? (
+                    <svg className="animate-spin inline h-5 w-5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : "🎲"}
+                </button>
               </div>
               <div className="text-sm opacity-90 mt-1">
                 {character.race} • {character.class}

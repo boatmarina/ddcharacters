@@ -54,6 +54,7 @@ export default function Home() {
   const [description, setDescription] = useState("");
   const [level, setLevel] = useState(3);
   const [character, setCharacter] = useState<Character | null>(null);
+  const [currentCharacterId, setCurrentCharacterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>([]);
@@ -64,8 +65,21 @@ export default function Home() {
 
   const loadCharacter = useCallback((saved: SavedCharacter) => {
     setCharacter(saved.data);
+    setCurrentCharacterId(saved.id);
     setError(null);
   }, []);
+
+  const handleNameChange = useCallback((name: string) => {
+    setCharacter((prev) => (prev ? { ...prev, name } : null));
+    // Also update the name in the saved history entry
+    if (currentCharacterId) {
+      const saved = loadSavedCharacters().map((c) =>
+        c.id === currentCharacterId ? { ...c, name, data: { ...c.data, name } } : c
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      setSavedCharacters(saved);
+    }
+  }, [currentCharacterId]);
 
   const deleteCharacter = useCallback((id: string) => {
     const saved = loadSavedCharacters().filter((c) => c.id !== id);
@@ -158,6 +172,7 @@ export default function Home() {
       // Save to localStorage
       const updated = saveCharacterToHistory(parsed);
       setSavedCharacters(updated);
+      setCurrentCharacterId(updated[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -356,7 +371,7 @@ export default function Home() {
               </button>
             </div>
             <div id="print-area" className="rounded-xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]">
-              <CharacterSheet character={character} />
+              <CharacterSheet character={character} onNameChange={handleNameChange} />
             </div>
           </div>
         )}
