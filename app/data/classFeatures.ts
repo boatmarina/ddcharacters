@@ -779,6 +779,152 @@ interface CharFeat {
   description: string;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Does the description explicitly mention limited uses (per rest, charges, etc.)? */
+function mentionsUsage(desc: string): boolean {
+  return /\bper (long |short )?(rest|day)\b|once per\b|\bcharges?\b|\buse[sd]?\b.{0,30}\bper\b/i.test(desc);
+}
+
+/** Does the description mention a timed duration? */
+function mentionsDuration(desc: string): boolean {
+  return /\b\d+ (minute|hour|round|turn)s?\b|lasts? for\b|\bduration\b/i.test(desc);
+}
+
+/** First sentence of a description (for concise references). */
+function firstSentence(desc: string): string {
+  const m = desc.match(/^.+?[.!?](?:\s|$)/);
+  return m ? m[0].trim() : desc;
+}
+
+/** First 1–2 words of a feature name (for building sub-names). */
+function shortName(feat: CharFeat): string {
+  return feat.name.split(/\s+/).slice(0, 2).join(" ");
+}
+
+/**
+ * Generate an "Improved X" description that actually makes sense for
+ * the ability's type — passive abilities don't get "use it more / lasts longer".
+ */
+function improvedDesc(feat: CharFeat): string {
+  const { name, description: desc } = feat;
+  const hasUsage = mentionsUsage(desc);
+  const hasDur = mentionsDuration(desc);
+
+  if (!hasUsage && !hasDur) {
+    // Passive ability — expand scope and depth, never mention actions or limits
+    return `Your ${name} grows in depth and precision. ${desc} You now notice hidden connections, implied meanings, and subtle details that others miss entirely — and you can articulate exactly what you observe with enough clarity that allies benefit from your analysis even second-hand.`;
+  }
+  if (hasUsage && hasDur) {
+    return `Your ${name} intensifies: ${firstSentence(desc)} You can use it one additional time per rest and its duration doubles.`;
+  }
+  if (hasUsage) {
+    return `Your ${name} grows more accessible: ${firstSentence(desc)} You can use it one additional time per rest and each use is noticeably more potent.`;
+  }
+  // Duration only
+  return `Your ${name} becomes more sustained: ${firstSentence(desc)} Its duration doubles, and while active the effect is significantly stronger.`;
+}
+
+/**
+ * Generate an "Advanced X" description appropriate for the ability type.
+ */
+function advancedDesc(feat: CharFeat): string {
+  const { name, description: desc } = feat;
+  const hasUsage = mentionsUsage(desc);
+  const hasDur = mentionsDuration(desc);
+
+  if (!hasUsage && !hasDur) {
+    return `Your mastery of ${name} reaches a new level. ${desc} You can now extend the benefits of this ability to one willing ally within 30 feet — describing what you perceive with enough precision that they gain the same advantage on related checks as you do.`;
+  }
+  if (hasUsage) {
+    return `Your mastery of ${name} deepens: ${firstSentence(desc)} The number of uses doubles, its area of effect or number of targets increases by one, and the power of each use is meaningfully greater.`;
+  }
+  return `Your mastery of ${name} deepens: ${firstSentence(desc)} Its duration doubles and its area of effect or number of targets increases, making it significantly more impactful in any situation.`;
+}
+
+/**
+ * Generate a "Perfect X" description appropriate for the ability type.
+ */
+function perfectDesc(feat: CharFeat): string {
+  const { name, description: desc } = feat;
+  const hasUsage = mentionsUsage(desc);
+  const hasDur = mentionsDuration(desc);
+
+  if (!hasUsage && !hasDur) {
+    return `You have achieved perfect mastery of ${name}. ${desc} This ability now operates flawlessly even under extreme stress or magical interference — and you can extend its benefits to up to two willing allies within 30 feet who are observing the same thing you are.`;
+  }
+  if (hasUsage) {
+    return `You have perfected ${name}: ${firstSentence(desc)} It now activates as a bonus action, its power is dramatically greater than before, and all uses recharge on a short rest.`;
+  }
+  return `You have perfected ${name}: ${firstSentence(desc)} Its effects become permanent while you are conscious, the power is dramatically amplified, and allies within 30 feet share a portion of the benefit.`;
+}
+
+/**
+ * Invent a specific Level 6 path feature based on the character's features.
+ * References a real ability by name and gives it concrete D&D mechanics.
+ */
+function makePathFeature6(
+  pathLabel: string,
+  features: CharFeat[]
+): ClassFeature {
+  const src = features[1] ?? features[2] ?? features[0];
+  if (!src) {
+    return {
+      name: `${pathLabel}: Signature Technique`,
+      description: `Your path unlocks a signature technique. Once per short rest, you can take 1 minute to perfectly analyze a creature, object, or scene you can observe — you automatically succeed on one related ability check of your choice and learn one piece of information the DM would normally require a higher DC to reveal.`,
+    };
+  }
+  return {
+    name: `${pathLabel}: Empowered ${shortName(src)}`,
+    description: `Your ${pathLabel} training amplifies your ${src.name}. ${firstSentence(src.description)} When you apply this ability in a high-stakes situation, you automatically succeed on one relevant check per short rest, and you can reveal one detail that would normally require a DC 5 higher to discover.`,
+  };
+}
+
+/**
+ * Invent a specific Level 10 path feature — a synergy between two abilities.
+ */
+function makePathFeature10(
+  pathLabel: string,
+  features: CharFeat[]
+): ClassFeature {
+  const src1 = features[2] ?? features[1] ?? features[0];
+  const src2 = features[3] ?? features[0];
+  if (!src1) {
+    return {
+      name: `${pathLabel}: Heightened Insight`,
+      description: `Once per long rest, you can ask the DM one yes/no question about any creature or situation you've directly observed and receive a truthful answer. Additionally, you automatically sense when any creature within 30 feet is lying to you.`,
+    };
+  }
+  const refTwo =
+    src2 && src2.name !== src1.name
+      ? `your ${src1.name} and your ${src2.name}`
+      : `your ${src1.name}`;
+  return {
+    name: `${pathLabel}: ${shortName(src1)} Synergy`,
+    description: `Your path reveals the deep connection between ${refTwo}. Once per long rest you can combine them for a powerful effect: you gain advantage on all ability checks and saving throws for 1 minute, and during this time you automatically know if any creature within 30 feet is attempting to deceive, hide from, or ambush you.`,
+  };
+}
+
+/**
+ * Invent a specific Level 14 path capstone based on a key character feature.
+ */
+function makePathCapstone(
+  pathLabel: string,
+  features: CharFeat[]
+): ClassFeature {
+  const src = features[4] ?? features[3] ?? features[1] ?? features[0];
+  if (!src) {
+    return {
+      name: `${pathLabel}: Legendary Technique`,
+      description: `The pinnacle of your path grants a legendary ability: once per long rest, you automatically succeed on any single ability check, attack roll, or saving throw related to your core skills — treating the d20 roll as a natural 20.`,
+    };
+  }
+  return {
+    name: `${pathLabel}: ${shortName(src)} Perfection`,
+    description: `Your ${pathLabel} path culminates in the transcendent expression of ${src.name}. ${firstSentence(src.description)} Once per long rest, push this ability to its absolute limit: it affects all valid targets within 60 feet simultaneously, persists for 1 hour, and cannot be countered or dispelled by any means short of a Wish spell.`,
+  };
+}
+
 export function generateCustomProgression(
   className: string,
   characterFeatures: CharFeat[],
@@ -790,6 +936,7 @@ export function generateCustomProgression(
     name: "ASI / Feat",
     description: "Increase one ability score by 2, or two scores by 1 each, or choose a feat.",
   };
+  const pathLabel = subclass ?? `${className} Path`;
 
   const featureMap: Map<number, ClassFeature[]> = new Map();
   const add = (level: number, f: ClassFeature) => {
@@ -822,9 +969,8 @@ export function generateCustomProgression(
   // ── Level 3: subclass choice ────────────────────────────────────────────
   add(3, {
     name: subclass ? `${className} Path: ${subclass}` : `${className} Path (Subclass)`,
-    description: `Choose your ${className} specialization${subclass ? ` — ${subclass}` : ""}, defining your unique style. This path grants features at levels 3, 7, 10, and 14.`,
+    description: `Choose your ${className} specialization${subclass ? ` — ${subclass}` : ""}, defining your unique style. This path grants features at levels 6, 10, and 14.`,
   });
-  // give 4th feature at level 3 if available
   if (f(3)) add(3, asFeature(f(3)));
 
   // ── Level 5: power spike + 5th feature ─────────────────────────────────
@@ -841,25 +987,22 @@ export function generateCustomProgression(
   }
   if (f(4)) add(5, asFeature(f(4)));
 
-  // ── Level 6: subclass feature + improved version of feature[0] ─────────
-  add(6, {
-    name: "Path Feature",
-    description: `Your ${className} path grants an additional feature.`,
-  });
+  // ── Level 6: specific invented path feature + improved feature[0] ──────
+  add(6, makePathFeature6(pathLabel, characterFeatures));
   if (f(0)) {
     add(6, {
       name: `Improved ${f(0).name}`,
-      description: `Your ${f(0).name} grows more powerful: ${f(0).description} You can now use it one additional time per rest, and its effects last twice as long.`,
+      description: improvedDesc(f(0)),
     });
   }
 
-  // ── Level 7: path feature + 6th character feature ──────────────────────
+  // ── Level 7: 6th character feature or invented technique ───────────────
   if (f(5)) {
     add(7, asFeature(f(5)));
   } else {
     add(7, {
       name: `${className} Technique`,
-      description: `Your training yields a signature ${className.toLowerCase()} technique — a powerful maneuver or ability unique to your path that you can use once per short rest.`,
+      description: `Your training yields a signature technique — a powerful maneuver or ability unique to your path that you can use once per short rest.`,
     });
   }
 
@@ -867,15 +1010,12 @@ export function generateCustomProgression(
   add(9, {
     name: isSpellcaster ? "Arcane Resilience" : "Unbreakable",
     description: isSpellcaster
-      ? `Concentration saves use your full spellcasting modifier, and you have advantage on saving throws against spells and magical effects.`
-      : `When you would be reduced to 0 HP you can use your reaction to instead drop to 1 HP. Usable once per long rest. You also gain proficiency in one saving throw of your choice.`,
+      ? `Concentration saves now use your full spellcasting modifier, and you have advantage on saving throws against spells and magical effects.`
+      : `When you would be reduced to 0 HP, you can use your reaction to drop to 1 HP instead. Usable once per long rest. You also gain proficiency in one saving throw of your choice.`,
   });
 
-  // ── Level 10: path feature + 7th character feature ─────────────────────
-  add(10, {
-    name: "Path Feature",
-    description: `Your ${className} path grants a significant feature.`,
-  });
+  // ── Level 10: specific invented path feature + 7th character feature ───
+  add(10, makePathFeature10(pathLabel, characterFeatures));
   if (f(6)) add(10, asFeature(f(6)));
 
   // ── Level 11: attack or magic power spike ──────────────────────────────
@@ -887,57 +1027,55 @@ export function generateCustomProgression(
   } else {
     add(11, {
       name: "Greater Power",
-      description: `Once per turn when you cast a spell or use an ability that deals damage, you may reroll any number of damage dice and use either result. Your abilities now affect a wider area or more targets.`,
+      description: `Once per turn when you cast a spell or use an ability that deals damage, you may reroll any number of damage dice and use either result. Your abilities now affect a wider area or more targets than before.`,
     });
   }
 
   // ── Level 13: advanced version of feature[1] ───────────────────────────
-  const advSource = f(1) || f(0);
+  const advSource = f(1) ?? f(0);
   if (advSource) {
     add(13, {
       name: `Advanced ${advSource.name}`,
-      description: `Your mastery of ${advSource.name} reaches new heights — ${advSource.description} It can now target additional creatures, has extended range, and its power is significantly greater than before.`,
+      description: advancedDesc(advSource),
     });
   } else {
     add(13, {
       name: `${className} Expertise`,
-      description: `Decades of training grant you unparalleled expertise. Double your proficiency bonus on any ${className.toLowerCase()}-related check, and you can't have disadvantage on such checks.`,
+      description: `Decades of training grant you unparalleled expertise. Double your proficiency bonus on any ${className.toLowerCase()}-related check, and you cannot have disadvantage on such checks.`,
     });
   }
 
-  // ── Level 14: path capstone + 8th character feature ────────────────────
-  add(14, {
-    name: "Path Capstone",
-    description: `Your ${className} path grants its most powerful feature yet.`,
-  });
+  // ── Level 14: specific invented path capstone + 8th character feature ──
+  add(14, makePathCapstone(pathLabel, characterFeatures));
   if (f(7)) add(14, asFeature(f(7)));
 
   // ── Level 15: endurance milestone ──────────────────────────────────────
   add(15, {
     name: isSpellcaster ? "Spell Endurance" : "Indomitable Will",
     description: isSpellcaster
-      ? `You can maintain concentration on two spells simultaneously. Additionally, you can cast one spell of 5th level or lower without using a spell slot once per long rest.`
+      ? `You can maintain concentration on two spells simultaneously. Additionally, you can cast one spell of 5th level or lower without expending a spell slot once per long rest.`
       : `When you fail a saving throw, you can use your reaction to reroll it and take the new result. You may do this twice per long rest. You also gain resistance to one damage type of your choice.`,
   });
 
   // ── Level 17: perfect version of feature[2] ────────────────────────────
-  const perfSource = f(2) || f(1) || f(0);
+  const perfSource = f(2) ?? f(1) ?? f(0);
   if (perfSource) {
     add(17, {
       name: `Perfect ${perfSource.name}`,
-      description: `You have perfected your use of ${perfSource.name} — it no longer requires an action to activate (bonus action instead), its effects are dramatically more powerful, and it recharges on a short rest.`,
+      description: perfectDesc(perfSource),
     });
   }
   if (f(8)) add(17, asFeature(f(8)));
 
   // ── Level 18: legendary milestone ──────────────────────────────────────
+  const leg0 = f(0);
   add(18, {
-    name: isSpellcaster ? `Legendary Spellcraft` : `Legendary ${f(0)?.name ?? className}`,
+    name: isSpellcaster ? "Legendary Spellcraft" : `Legendary ${leg0?.name ?? className}`,
     description: isSpellcaster
-      ? `Your magic transcends mortal limits. Once per long rest, cast any spell you know at maximum effect without expending a spell slot and without concentration. Enemies have disadvantage on saves against your abilities.`
-      : f(0)
-      ? `Your ${f(0).name} transcends normal limits: ${f(0).description} The power is overwhelming — all nearby enemies must make a Wisdom save or be frightened for 1 minute.`
-      : `Your ${className.toLowerCase()} power becomes legendary. You are immune to being charmed or frightened, and your attacks are treated as magical and silvered.`,
+      ? `Your magic transcends mortal limits. Once per long rest, cast any spell you know at maximum effect without expending a spell slot and without requiring concentration. Enemies have disadvantage on saving throws against your abilities.`
+      : leg0
+      ? `Your ${leg0.name} transcends all normal limits. ${firstSentence(leg0.description)} Once per long rest, push it to its absolute peak: it is overwhelming in power, affects every valid target within 60 feet, and all affected creatures must succeed on a Wisdom save (DC 8 + prof + your primary ability mod) or be stunned until the end of your next turn.`
+      : `Your ${className.toLowerCase()} power becomes legendary. You are immune to being charmed or frightened, and your abilities are treated as magical and cannot be blocked by non-magical means.`,
   });
 
   // ── Level 20: paragon capstone ──────────────────────────────────────────
@@ -955,7 +1093,7 @@ export function generateCustomProgression(
   // ── Fill any remaining empty levels with generic flavored content ───────
   const genericFeature = (level: number): ClassFeature => ({
     name: `${className} Advancement`,
-    description: `Your ${className.toLowerCase()} training and experience at level ${level} sharpens an existing ability — increasing its range, number of uses, or potency — and grants minor utility unique to your specialization.`,
+    description: `Your ${className.toLowerCase()} experience at level ${level} deepens an existing ability — the scope and precision of one of your core features increases noticeably, and you gain a minor but useful utility unique to your specialization.`,
   });
 
   return Array.from({ length: 20 }, (_, i) => {
