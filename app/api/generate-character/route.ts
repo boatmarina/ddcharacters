@@ -17,6 +17,78 @@ You MUST follow these rules:
 7. The backstory should be accurate to the character's origin
 8. KEEP DESCRIPTIONS CONCISE — each feature/spell description must be 1-2 sentences max. Backstory max 2 sentences. Personality/ideals/bonds/flaws max 1 sentence each. Limit features to the 6 most important. Limit spells to 8 most iconic. This is critical to fit within token limits.
 
+════════════════════════════════════════════════════════════
+MANDATORY LEVEL-BASED BALANCE RULES — apply these exactly.
+These are hard constraints, not suggestions. The single biggest
+source of broken sheets is ignoring these and inflating numbers.
+════════════════════════════════════════════════════════════
+
+ABILITY SCORES
+Base your scores on the standard array (15,14,13,12,10,8) before applying a +2/+1 racial bonus. Each ASI (gained at the levels below) lets you raise one score by 2 or two scores by 1.
+• Levels 1–3  (0 ASIs): Primary stat max 17. Most other stats 8–14.
+• Levels 4–7  (1 ASI):  Primary stat up to 20. One secondary up to 16.
+• Levels 8–11 (2 ASIs): Up to two stats at 20.
+• Levels 12–15 (3 ASIs): Up to three stats at 20.
+• Levels 16–19 (4 ASIs): Up to four stats at 20.
+Never put multiple stats at 18+ at levels 1–3. That is the #1 over-power mistake.
+
+PROFICIENCY BONUS — fixed by level, no exceptions:
+  L1–4 = +2 | L5–8 = +3 | L9–12 = +4 | L13–16 = +5 | L17–20 = +6
+
+HIT POINTS — calculate precisely:
+  HP = (max hit die at level 1) + (average hit die × (level − 1)) + (CON modifier × level)
+  Average hit die per level after first: d6 → 4, d8 → 5, d10 → 6, d12 → 7
+  Examples:
+    Level 3 Fighter, CON 14 (+2): 10 + 2×6 + 3×2 = 28 HP
+    Level 5 Fighter, CON 14 (+2): 10 + 4×6 + 5×2 = 44 HP
+    Level 5 Wizard,  CON 12 (+1): 6  + 4×4 + 5×1 = 27 HP
+    Level 8 Rogue,   CON 14 (+2): 8  + 7×5 + 8×2 = 59 HP
+  Do NOT give a level 5 character 70+ HP — that is level 10+ territory.
+
+ATTACK BONUS — exactly: proficiency bonus + relevant ability modifier. Nothing else.
+  Level 3, STR 16 (+3): +2+3 = +5  |  Level 5, STR 18 (+4): +3+4 = +7
+  Level 8, STR 20 (+5): +3+5 = +8  |  Level 12, STR 20 (+5): +4+5 = +9
+  Magic weapon bonuses (+1/+2/+3) are rare rewards; avoid them below level 8.
+
+DAMAGE — weapon damage + ability modifier only (unless a specific class feature adds more):
+  Level 1–4:  1d6+2 to 1d8+3 is normal. Do not exceed 1d10+4.
+  Level 5–8:  1d8+4 to 2d6+5 is normal. Do not exceed 2d6+6.
+  Level 9–14: 1d8+5 to 2d6+6. Extra Attack damage counts separately per hit.
+  Level 15+:  Higher dice totals are acceptable.
+  "+8 or higher" damage modifiers on a basic attack are never appropriate below level 12.
+
+NUMBER OF ATTACKS per Attack action:
+  • 1 attack  → all classes at levels 1–4; non-martial classes (Wizard, Bard, Sorcerer, Warlock, Rogue, Cleric) always
+  • 2 attacks → martial classes (Fighter, Barbarian, Paladin, Ranger, Monk) at levels 5–10
+  • 3 attacks → Fighter only at levels 11–19
+  • 4 attacks → Fighter only at level 20
+  A level 3 character with two attacks is wrong. A Wizard with two attacks is wrong.
+
+SPELL SLOTS — use the exact standard D&D full-caster table:
+  L1: 2/0/0/0/0/0/0/0/0  L2: 3/0/...  L3: 4/2/0/...  L4: 4/3/0/...
+  L5: 4/3/2/0/...  L6: 4/3/3/0/...  L7: 4/3/3/1/...  L8: 4/3/3/2/...
+  L9: 4/3/3/3/1/...  L10: 4/3/3/3/2/...  L11: 4/3/3/3/2/1/...
+  (Half-casters like Paladin/Ranger get one tier lower; Warlock uses Pact Magic.)
+
+HIGHEST SPELL LEVEL A FULL CASTER CAN ACCESS:
+  L1–2 → 1st  |  L3–4 → 2nd  |  L5–6 → 3rd  |  L7–8 → 4th
+  L9–10 → 5th  |  L11–12 → 6th  |  L13–14 → 7th  |  L15–16 → 8th  |  L17+ → 9th
+  Do NOT list spells above this threshold in the spells array or slot keys.
+
+SPELL SAVE DC  = 8 + proficiency bonus + spellcasting ability modifier. No exceptions.
+SPELL ATK BONUS = proficiency bonus + spellcasting ability modifier.
+
+ARMOR CLASS — realistic ranges:
+  Unarmored: 10–13. Light armor: 13–15. Medium armor (max +2 DEX): 14–17.
+  Heavy armor: 16–18. With shield: +2. AC 19+ requires magic armor or a specific high-level feature.
+
+CLASS FEATURES — only include features the character has actually earned at or below their level.
+  Do NOT give a level 3 character features that require level 6, 10, or higher.
+
+REMINDER: Apply every rule above for whatever level the user specifies.
+The sheet should feel like a character of THAT level — not two levels higher.
+════════════════════════════════════════════════════════════
+
 Return ONLY valid JSON matching this exact schema, no other text:
 
 {
@@ -164,7 +236,7 @@ export async function POST(req: NextRequest) {
     messages: [
       {
         role: "user" as const,
-        content: `Create a D&D character sheet at LEVEL ${desiredLevel} for the following character:\n\n${description}`,
+        content: `Create a D&D character sheet at LEVEL ${desiredLevel} for the following character. Apply all mandatory balance rules for level ${desiredLevel} exactly — correct ability score caps, HP formula, attack bonus formula, damage ranges, number of attacks, and spell level access.\n\n${description}`,
       },
     ],
     system: SYSTEM_PROMPT,
