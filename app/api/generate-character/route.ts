@@ -48,14 +48,18 @@ HIT POINTS — calculate precisely:
 ATTACK BONUS — exactly: proficiency bonus + relevant ability modifier. Nothing else.
   Level 3, STR 16 (+3): +2+3 = +5  |  Level 5, STR 18 (+4): +3+4 = +7
   Level 8, STR 20 (+5): +3+5 = +8  |  Level 12, STR 20 (+5): +4+5 = +9
-  Magic weapon bonuses (+1/+2/+3) are rare rewards; avoid them below level 8.
+  Magic weapon bonuses (+1/+2/+3): use sparingly at lower levels, but they are allowed
+  if the character is iconic for a legendary weapon (e.g. a hero defined by their magic sword).
+  If you give a low-level character a +2 or +3 weapon, compensate by making their other
+  stats, HP, or AC notably weaker than normal for their level.
 
-DAMAGE — weapon damage + ability modifier only (unless a specific class feature adds more):
-  Level 1–4:  1d6+2 to 1d8+3 is normal. Do not exceed 1d10+4.
-  Level 5–8:  1d8+4 to 2d6+5 is normal. Do not exceed 2d6+6.
-  Level 9–14: 1d8+5 to 2d6+6. Extra Attack damage counts separately per hit.
-  Level 15+:  Higher dice totals are acceptable.
-  "+8 or higher" damage modifiers on a basic attack are never appropriate below level 12.
+DAMAGE — weapon damage + ability modifier, plus any class features that explicitly add damage:
+  Typical ranges: L1–4: 1d6+2 to 1d8+3 | L5–8: 1d8+4 to 2d6+5 | L9–14: up to 2d6+6.
+  These are guidelines, not hard caps. A character whose core identity is massive damage
+  output (e.g. a berserker, a legendary swordsman, a demon) can exceed them — but you MUST
+  compensate elsewhere: lower HP, lower AC, weaker saving throws, fewer class features,
+  or lower ability scores in non-primary stats. The sheet's overall power should still
+  match its level. Never inflate damage AND stats AND HP AND AC simultaneously.
 
 NUMBER OF ATTACKS per Attack action:
   • 1 attack  → all classes at levels 1–4; non-martial classes (Wizard, Bard, Sorcerer, Warlock, Rogue, Cleric) always
